@@ -9,11 +9,11 @@ from sqlalchemy.orm import Session
 from madr.database import get_session
 from madr.models import Book, User
 from madr.schemas import (
-    Message,
     BookList,
     BookPublic,
     BookSchema,
     BookUpdate,
+    Message,
 )
 from madr.security import get_current_user
 
@@ -32,7 +32,7 @@ def create_book(
         title=book.title,
         year=book.year,
         user_id=user.id,
-        author_id=book.author_id
+        author_id=book.author_id,
     )
     session.add(db_book)
     session.commit()

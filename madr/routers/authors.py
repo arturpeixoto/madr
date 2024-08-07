@@ -9,11 +9,11 @@ from sqlalchemy.orm import Session
 from madr.database import get_session
 from madr.models import Author, User
 from madr.schemas import (
-    Message,
     AuthorList,
     AuthorPublic,
     AuthorSchema,
     AuthorUpdate,
+    Message,
 )
 from madr.security import get_current_user
 
@@ -28,10 +28,7 @@ def create_author(
     author: AuthorSchema,
     session: T_Session,
 ):
-    db_author = Author(
-        name=author.name,
-        created_by_user=user.id
-    )
+    db_author = Author(name=author.name, created_by_user=user.id)
     session.add(db_author)
     session.commit()
     session.refresh(db_author)
@@ -61,10 +58,15 @@ def list_authors(
     '/{author_id}', status_code=HTTPStatus.OK, response_model=AuthorPublic
 )
 def update_author(
-    author_id: int, user: T_CurrentUser, session: T_Session, author: AuthorUpdate
+    author_id: int,
+    user: T_CurrentUser,
+    session: T_Session,
+    author: AuthorUpdate,
 ):
     db_author = session.scalar(
-        select(Author).where(Author.created_by_user == user.id, Author.id == author_id)
+        select(Author).where(
+            Author.created_by_user == user.id, Author.id == author_id
+        )
     )
 
     if not db_author:
@@ -82,10 +84,14 @@ def update_author(
     return db_author
 
 
-@router.delete('/{author_id}', response_model=Message, status_code=HTTPStatus.OK)
+@router.delete(
+    '/{author_id}', response_model=Message, status_code=HTTPStatus.OK
+)
 def delete_author(author_id: int, session: T_Session, user: T_CurrentUser):
     db_author = session.scalar(
-        select(Author).where(Author.created_by_user == user.id, Author.id == author_id)
+        select(Author).where(
+            Author.created_by_user == user.id, Author.id == author_id
+        )
     )
 
     if not db_author:
