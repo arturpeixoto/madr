@@ -1,8 +1,10 @@
 from datetime import datetime
+
 from sqlalchemy import ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, registry, relationship
 
 table_registry = registry()
+
 
 @table_registry.mapped_as_dataclass
 class User:
@@ -20,10 +22,10 @@ class User:
     )
 
     books: Mapped[list['Book']] = relationship(
-        init=False, back_populates='user', cascade='all, delete-orphan'
+        init=False, back_populates='user'
     )
     authors: Mapped[list['Author']] = relationship(
-        init=False, back_populates='user', cascade='all, delete-orphan'
+        init=False, back_populates='user'
     )
 
 
@@ -37,8 +39,8 @@ class Book:
     author_id: Mapped[int] = mapped_column(
         ForeignKey('authors.id', ondelete='SET NULL'), nullable=True
     )
-    created_by_user: Mapped[int] = mapped_column(
-        ForeignKey('users.id', ondelete='SET NULL'), nullable=False
+    managed_by_user: Mapped[int] = mapped_column(
+        ForeignKey('users.id', ondelete='SET NULL'), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         init=False, server_default=func.now()
@@ -57,8 +59,8 @@ class Author:
 
     id: Mapped[int] = mapped_column(init=False, primary_key=True)
     name: Mapped[str]
-    created_by_user: Mapped[int] = mapped_column(
-        ForeignKey('users.id', ondelete='SET NULL'), nullable=False
+    managed_by_user: Mapped[int] = mapped_column(
+        ForeignKey('users.id', ondelete='SET NULL'), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         init=False, server_default=func.now()

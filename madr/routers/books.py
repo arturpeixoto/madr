@@ -57,7 +57,7 @@ def create_book(
     db_book = Book(
         title=sanitized_title,
         year=book.year,
-        created_by_user=user.id,
+        managed_by_user=user.id,
         author_id=book.author_id,
     )
     session.add(db_book)
@@ -96,21 +96,25 @@ def list_books(  # noqa
 def update_book(
     book_id: int, user: T_CurrentUser, session: T_Session, book: BookUpdate
 ):
-    db_book = session.scalar(
-        select(Book).where(Book.created_by_user == user.id, Book.id == book_id)
-    )
+    db_book = session.scalar(select(Book).where(Book.id == book_id))
 
     if not db_book:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail='Book not found'
         )
 
+    if db_book.managed_by_user is None:
+        db_book.managed_by_user = user.id
+    elif db_book.managed_by_user != user.id:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN,
+            detail='You do not have permission to modify this book',
+        )
+
     if 'title' in book.model_dump(exclude_unset=True):
         sanitized_title = sanitize_string(book.title)
         existing_book = session.scalar(
-            select(Book).where(
-                Book.title == sanitized_title, Book.user_id == user.id
-            )
+            select(Book).where(Book.title == sanitized_title)
         )
         if existing_book and existing_book.id != book_id:
             raise HTTPException(
@@ -141,13 +145,19 @@ def update_book(
 
 @router.delete('/{book_id}', response_model=Message, status_code=HTTPStatus.OK)
 def delete_book(book_id: int, session: T_Session, user: T_CurrentUser):
-    db_book = session.scalar(
-        select(Book).where(Book.created_by_user == user.id, Book.id == book_id)
-    )
+    db_book = session.scalar(select(Book).where(Book.id == book_id))
 
     if not db_book:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail='Book not found'
+        )
+
+    if db_book.managed_by_user is None:
+        db_book.managed_by_user = user.id
+    elif db_book.managed_by_user != user.id:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN,
+            detail='You do not have permission to delete this book',
         )
 
     session.delete(db_book)

@@ -43,7 +43,7 @@ def create_author(
             detail='Author with the same name already exists',
         )
 
-    db_author = Author(name=sanitized_name, created_by_user=user.id)
+    db_author = Author(name=sanitized_name, managed_by_user=user.id)
     session.add(db_author)
     session.commit()
     session.refresh(db_author)
@@ -106,8 +106,10 @@ def update_author(
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail='Author not found'
         )
-    
-    if db_author.created_by_user != user.id:
+
+    if db_author.managed_by_user is None:
+        db_author.managed_by_user = user.id
+    elif db_author.managed_by_user != user.id:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN,
             detail='You do not have permission to modify this author',
@@ -151,8 +153,10 @@ def delete_author(author_id: int, session: T_Session, user: T_CurrentUser):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail='Author not found'
         )
-    
-    if db_author.created_by_user != user.id:
+
+    if db_author.managed_by_user is None:
+        db_author.managed_by_user = user.id
+    elif db_author.managed_by_user != user.id:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN,
             detail='You do not have permission to delete this author',
