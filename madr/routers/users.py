@@ -21,6 +21,7 @@ T_CurrentUser = Annotated[User, Depends(get_current_user)]
 @router.get('/', response_model=UserList)
 def read_users(
     session: T_Session,
+    current_user: T_CurrentUser,
     skip: int = 0,
     limit: int = 100,
 ):
@@ -29,7 +30,7 @@ def read_users(
 
 
 @router.get('/{user_id}', status_code=HTTPStatus.OK, response_model=UserPublic)
-def get_user(user_id: int, session: T_Session):
+def get_user(user_id: int, session: T_Session, current_user: T_CurrentUser,):
     db_user = session.scalar(select(User).where(User.id == user_id))
     if not db_user:
         raise HTTPException(

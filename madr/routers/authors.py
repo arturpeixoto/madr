@@ -1,3 +1,4 @@
+import re
 from http import HTTPStatus
 from typing import Annotated
 
@@ -22,13 +23,27 @@ T_Session = Annotated[Session, Depends(get_session)]
 T_CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+def sanitize_string(value: str) -> str:
+    return re.sub(r'\s+', ' ', re.sub(r'[^\w\s]', '', value)).strip().lower()
+
+
 @router.post('/', status_code=HTTPStatus.CREATED, response_model=AuthorPublic)
 def create_author(
     user: T_CurrentUser,
     author: AuthorSchema,
     session: T_Session,
 ):
-    db_author = Author(name=author.name, created_by_user=user.id)
+    sanitized_name = sanitize_string(author.name)
+    existing_author = session.scalar(
+        select(Author).where(Author.name == sanitized_name)
+    )
+    if existing_author:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail='Author with the same name already exists',
+        )
+
+    db_author = Author(name=sanitized_name, created_by_user=user.id)
     session.add(db_author)
     session.commit()
     session.refresh(db_author)
@@ -44,14 +59,32 @@ def list_authors(
     offset: int = Query(None),
     limit: int = Query(None),
 ):
-    query = select(Author).where(Author.created_by_user == user.id)
-
+    query = session.query(Author)
     if name:
-        query = query.filter(Author.name.contains(name))
+        sanitized_name = sanitize_string(name)
+        query = query.filter(Author.name.contains(sanitized_name))
 
     authors = session.scalars(query.offset(offset).limit(limit)).all()
 
     return {'authors': authors}
+
+
+@router.get(
+    '/{author_id}', response_model=AuthorPublic, status_code=HTTPStatus.OK
+)
+def get_author_by_id(author_id: int, session: T_Session, user: T_CurrentUser):
+    db_author = session.scalar(
+        select(Author).where(
+            Author.id == author_id,
+        )
+    )
+
+    if not db_author:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail='Author not found'
+        )
+
+    return db_author
 
 
 @router.patch(
@@ -65,7 +98,7 @@ def update_author(
 ):
     db_author = session.scalar(
         select(Author).where(
-            Author.created_by_user == user.id, Author.id == author_id
+            Author.id == author_id,
         )
     )
 
@@ -73,6 +106,26 @@ def update_author(
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail='Author not found'
         )
+    
+    if db_author.created_by_user != user.id:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN,
+            detail='You do not have permission to modify this author',
+        )
+
+    if 'name' in author.model_dump(exclude_unset=True):
+        sanitized_name = sanitize_string(author.name)
+        existing_author = session.scalar(
+            select(Author).where(
+                Author.name == sanitized_name,
+            )
+        )
+        if existing_author and existing_author.id != author_id:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail='Author with the same name already exists',
+            )
+        setattr(db_author, 'name', sanitized_name)
 
     for key, value in author.model_dump(exclude_unset=True).items():
         setattr(db_author, key, value)
@@ -90,13 +143,19 @@ def update_author(
 def delete_author(author_id: int, session: T_Session, user: T_CurrentUser):
     db_author = session.scalar(
         select(Author).where(
-            Author.created_by_user == user.id, Author.id == author_id
+            Author.id == author_id,
         )
     )
 
     if not db_author:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail='Author not found'
+        )
+    
+    if db_author.created_by_user != user.id:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN,
+            detail='You do not have permission to delete this author',
         )
 
     session.delete(db_author)

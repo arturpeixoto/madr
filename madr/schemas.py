@@ -35,13 +35,14 @@ class TokenData(BaseModel):
 class BookSchema(BaseModel):
     title: str
     year: int
-    author_id: int
+    author_id: int | None
 
 
 class BookPublic(BookSchema):
     id: int
     created_at: datetime
     updated_at: datetime
+    created_by_user: int
 
 
 class BookList(BaseModel):
@@ -62,6 +63,7 @@ class AuthorPublic(AuthorSchema):
     id: int
     created_at: datetime
     updated_at: datetime
+    created_by_user: int
 
 
 class AuthorList(BaseModel):
